@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ink Arena — Prototype</title>
+<style>
+:root{color-scheme:dark;--cyan:#36e7ff;--pink:#ff4b9a}
+*{box-sizing:border-box}body{margin:0;background:#08101e;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+#game{position:fixed;inset:0}canvas{display:block}
+.hud{position:fixed;z-index:2;left:18px;top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;pointer-events:none}
+.pill{background:#101b30d9;border:1px solid #ffffff20;border-radius:14px;padding:10px 14px;backdrop-filter:blur(12px);box-shadow:0 8px 30px #0003}
+.brand{font-weight:900;letter-spacing:.06em;font-size:18px}.brand span{color:var(--cyan)}.stat{font-size:13px;color:#c5d3e9}.stat b{color:white;font-size:17px;margin-left:5px}
+#help{position:fixed;z-index:2;left:18px;bottom:18px;max-width:min(440px,calc(100vw - 36px));line-height:1.55;font-size:13px;color:#dce7f8}
+#help b{color:white}#message{position:fixed;z-index:3;top:20px;left:50%;transform:translateX(-50%);background:#111d32df;border:1px solid #ffffff25;border-radius:999px;padding:10px 18px;font-weight:700;text-align:center;white-space:nowrap;max-width:calc(100vw - 24px);font-size:13px}
+#start{position:fixed;z-index:4;inset:0;display:grid;place-items:center;background:linear-gradient(135deg,#07101ddd,#111b31cc);backdrop-filter:blur(10px)}
+.panel{width:min(520px,calc(100vw - 32px));padding:30px;border:1px solid #ffffff25;border-radius:28px;background:#101a2deF;box-shadow:0 25px 100px #0008}
+h1{margin:0 0 8px;font-size:clamp(34px,7vw,54px);letter-spacing:-.04em}h1 span{color:var(--cyan)}.sub{color:#b9c8df;margin:0 0 22px;line-height:1.6}
+.features{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0 24px}.feature{background:#ffffff08;border:1px solid #ffffff14;border-radius:14px;padding:12px;font-size:13px;color:#d8e4f5}.feature strong{display:block;font-size:15px;color:white;margin-bottom:3px}
+button{border:0;border-radius:14px;padding:14px 20px;font-size:16px;font-weight:850;cursor:pointer;color:#07101d;background:linear-gradient(100deg,#36e7ff,#7df5cf);width:100%;box-shadow:0 8px 28px #36e7ff22}button:hover{filter:brightness(1.08)}
+#reticle{position:fixed;z-index:2;left:50%;top:50%;width:12px;height:12px;transform:translate(-50%,-50%);border:2px solid #fff9;border-radius:50%;pointer-events:none;display:none}
+@media(max-width:560px){.hud{left:8px;top:8px;gap:6px}.pill{padding:8px 10px}.brand{font-size:14px}.stat{font-size:11px}#help{left:8px;bottom:8px;font-size:11px}.features{grid-template-columns:1fr 1fr}.panel{padding:22px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div class="hud">
+ <div class="pill brand">INK <span>ARENA</span></div>
+ <div class="pill stat">YOU <b id="yourScore">0%</b></div>
+ <div class="pill stat">CPU <b id="cpuScore">0%</b></div>
+ <div class="pill stat">TIME <b id="timer">90</b></div>
+</div>
+<div id="message">床を自分の色に塗ろう！</div>
+<div id="help" class="pill"><b>操作</b>　WASD：移動　マウス：見回す　クリック / Space：インク発射　Shift：ダッシュ<br>青いインクをたくさん塗ると勝利！ CPUも床を塗り返してくるよ。</div>
+<div id="reticle"></div>
+<div id="start"><div class="panel">
+ <h1>INK <span>ARENA</span></h1>
+ <p class="sub">小さな3Dインクバトル試作版。まずは走って、撃って、アリーナを自分の色に染めよう。</p>
+ <div class="features">
+  <div class="feature"><strong>🌀 3Dアリーナ</strong>ブラウザで動く立体ステージ</div>
+  <div class="feature"><strong>💦 インクバトル</strong>撃った場所がチームカラーに</div>
+  <div class="feature"><strong>🤖 CPU対戦</strong>CPUも動いて塗り返す</div>
+  <div class="feature"><strong>📊 エリア集計</strong>塗った床の割合を表示</div>
+ </div>
+ <button id="play">バトル開始！</button>
+ <p style="font-size:12px;color:#8fa2bf;margin:14px 0 0">Prototype 0.1 · オンライン対戦は次の開発段階</p>
+</div></div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js';
+
+const root=document.querySelector('#game');
+const scene=new THREE.Scene();scene.background=new THREE.Color('#101c30');scene.fog=new THREE.Fog('#101c30',28,65);
+const camera=new THREE.PerspectiveCamera(68,innerWidth/innerHeight,.1,100);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xb9e7ff,0x20243d,2.1));
+const sun=new THREE.DirectionalLight(0xffffff,2.4);sun.position.set(-8,16,9);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+const blue=0x36e7ff,pink=0xff4b9a,neutral=0x25334b;
+const floorGeo=new THREE.PlaneGeometry(1,1);
+const tiles=[],N=24,spacing=1.25,half=(N-1)*spacing/2;
+const floorMat=new THREE.MeshStandardMaterial({color:neutral,roughness:.82});
+for(let z=0;z<N;z++)for(let x=0;x<N;x++){
+ const m=new THREE.Mesh(floorGeo,floorMat.clone());m.rotation.x=-Math.PI/2;m.position.set(x*spacing-half,0,z*spacing-half);m.receiveShadow=true;scene.add(m);
+ const grid=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(.99,.015,.99)),new THREE.LineBasicMaterial({color:0x53617a,transparent:true,opacity:.35}));grid.position.set(m.position.x,.012,m.position.z);scene.add(grid);
+ tiles.push({x:m.position.x,z:m.position.z,mesh:m,owner:0});
+}
+const wallMat=new THREE.MeshStandardMaterial({color:0x17253b,roughness:.65});
+function block(x,y,z,sx,sy,sz,color=0x1b2b44){const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),new THREE.MeshStandardMaterial({color,roughness:.6,metalness:.12}));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m}
+block(0,-.25,0,N*spacing,.5,N*spacing,0x111b2b);
+for(let i=0;i<4;i++){const a=-8+i*5.3;block(a,1,-7,2.4,2,1.2,0x203a55);block(-a,1,7,2.4,2,1.2,0x3a2448)}
+for(const [x,z] of [[-5,-4],[5,-4],[-5,4],[5,4],[0,-8],[0,8]]){block(x,.6,z,1.5,1.2,1.5,0x293b56);const glow=new THREE.Mesh(new THREE.BoxGeometry(1.52,.06,1.52),new THREE.MeshBasicMaterial({color:0x36e7ff}));glow.position.set(x,1.23,z);scene.add(glow)}
+// Keep a clean playable central lane.
+const bodyGeo=new THREE.CapsuleGeometry(.42,.75,4,8);
+function makePlayer(color,x,z,isCPU=false){
+ const group=new THREE.Group();const body=new THREE.Mesh(bodyGeo,new THREE.MeshStandardMaterial({color,roughness:.35,metalness:.08}));body.position.y=.72;body.castShadow=true;group.add(body);
+ const visor=new THREE.Mesh(new THREE.BoxGeometry(.48,.16,.12),new THREE.MeshStandardMaterial({color:0xffffff,emissive:color,emissiveIntensity:.35}));visor.position.set(0,1.05,-.36);group.add(visor);
+ const gun=new THREE.Mesh(new THREE.CylinderGeometry(.1,.13,.65,8),new THREE.MeshStandardMaterial({color:0xdce7f5,metalness:.5,roughness:.3}));gun.rotation.x=Math.PI/2;gun.position.set(.28,.75,-.48);group.add(gun);
+ group.position.set(x,0,z);scene.add(group);return {group,body,isCPU,color,x,z,angle:0,hp:100,nextShot:0,aiTarget:null};
+}
+const player=makePlayer(blue,0,5,false),cpu=makePlayer(pink,1,-5,true);
+let playing=false,ended=false,time=90,painted=0,cpuPainted=0,last=performance.now(),shotCooldown=0,move={};let yaw=0,pitch=-.15;
+const projectiles=[];const splats=[];
+function nearestTile(x,z){let best=null,d=Infinity;for(const t of tiles){const q=(t.x-x)**2+(t.z-z)**2;if(q<d){d=q;best=t}}return best}
+function paintAt(x,z,team,radius=1.7){for(const t of tiles){const d=Math.hypot(t.x-x,t.z-z);if(d<radius){const chance=1-d/radius;if(Math.random()<.3+chance*.7){if(t.owner!==team){if(t.owner===0){team===1?painted++:cpuPainted++}else if(t.owner===1){painted=Math.max(0,painted-1);cpuPainted++}else{cpuPainted=Math.max(0,cpuPainted-1);painted++}t.owner=team}t.mesh.material.color.set(team===1?blue:team===2?pink:neutral);t.mesh.material.emissive.set(team===1?blue:team===2?pink:0x000000);t.mesh.material.emissiveIntensity=.14;}}}}
+function fire(p,team,dir){const start=p.group.position.clone();start.y=.85;const ball=new THREE.Mesh(new THREE.SphereGeometry(.16,10,8),new THREE.MeshBasicMaterial({color:team===1?blue:pink}));ball.position.copy(start);scene.add(ball);projectiles.push({mesh:ball,vel:dir.clone().normalize().multiplyScalar(17),team,life:1.25});paintAt(start.x,start.z,team,1.15)}
+function shootPlayer(){if(!playing||shotCooldown>0)return;shotCooldown=.18;const dir=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));fire(player,1,dir)}
+addEventListener('keydown',e=>{move[e.code]=true;if(e.code==='Space'){e.preventDefault();shootPlayer()}if(e.code==='ShiftLeft'||e.code==='ShiftRight'){}});
+addEventListener('keyup',e=>move[e.code]=false);
+renderer.domElement.addEventListener('click',()=>{if(playing){if(document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock?.();shootPlayer()}});
+addEventListener('mousemove',e=>{if(playing&&document.pointerLockElement===renderer.domElement){yaw-=e.movementX*.0025;pitch=Math.max(-.55,Math.min(.35,pitch-e.movementY*.0018))}});
+function moveEntity(p,dx,dz){const nx=THREE.MathUtils.clamp(p.group.position.x+dx,-half+1,half-1),nz=THREE.MathUtils.clamp(p.group.position.z+dz,-half+1,half-1);p.group.position.x=nx;p.group.position.z=nz}
+function updateCPU(dt,now){const dx=player.group.position.x-cpu.group.position.x,dz=player.group.position.z-cpu.group.position.z,dist=Math.hypot(dx,dz);if(dist>7){const target=nearestTile(cpu.group.position.x+Math.sin(now*.0008)*3,cpu.group.position.z+Math.cos(now*.0007)*3);cpu.aiTarget={x:target.x,z:target.z};}else cpu.aiTarget={x:player.group.position.x,z:player.group.position.z};const tx=cpu.aiTarget.x-cpu.group.position.x,tz=cpu.aiTarget.z-cpu.group.position.z,len=Math.hypot(tx,tz)||1;moveEntity(cpu,tx/len*dt*2.5,tz/len*dt*2.5);cpu.group.rotation.y=Math.atan2(tx,tz);if(now>cpu.nextShot){cpu.nextShot=now+(dist<9?550:850);const dir=new THREE.Vector3(dx,0,dz);fire(cpu,2,dir);if(Math.random()<.75)paintAt(cpu.group.position.x+Math.random()*2-1,cpu.group.position.z+Math.random()*2-1,2,1.5)}}
+function updateUI(){document.querySelector('#yourScore').textContent=Math.round(tiles.filter(t=>t.owner===1).length/tiles.length*100)+'%';document.querySelector('#cpuScore').textContent=Math.round(tiles.filter(t=>t.owner===2).length/tiles.length*100)+'%';document.querySelector('#timer').textContent=Math.max(0,Math.ceil(time))}
+function finish(){playing=false;ended=true;document.exitPointerLock?.();const you=tiles.filter(t=>t.owner===1).length,c=tiles.filter(t=>t.owner===2).length;document.querySelector('#message').textContent=you>=c?'勝利！アリーナを青く染めた！':'CPUの勝ち！もう一度チャレンジ！';document.querySelector('#start').style.display='grid';document.querySelector('#start h1').innerHTML=you>=c?'YOU <span>WIN!</span>':'CPU <span>WINS</span>';document.querySelector('#start .sub').textContent='結果：あなた '+Math.round(you/tiles.length*100)+'% ／ CPU '+Math.round(c/tiles.length*100)+'%。もう一戦いく？';document.querySelector('#play').textContent='もう一度プレイ';document.querySelector('#reticle').style.display='none'}
+function reset(){for(const t of tiles){t.owner=0;t.mesh.material.color.set(neutral);t.mesh.material.emissive.set(0x000000)}for(const p of projectiles)scene.remove(p.mesh);projectiles.length=0;player.group.position.set(0,0,5);cpu.group.position.set(1,0,-5);yaw=0;pitch=-.15;time=90;shotCooldown=0;ended=false;playing=true;document.querySelector('#start').style.display='none';document.querySelector('#message').textContent='床を自分の色に塗ろう！';document.querySelector('#reticle').style.display='block';updateUI()}
+document.querySelector('#play').addEventListener('click',reset);
+function loop(now){requestAnimationFrame(loop);const dt=Math.min((now-last)/1000,.04);last=now;
+ if(playing){time-=dt;shotCooldown=Math.max(0,shotCooldown-dt);let f=(move.KeyW?1:0)-(move.KeyS?1:0),s=(move.KeyD?1:0)-(move.KeyA?1:0);const speed=(move.ShiftLeft||move.ShiftRight)?9:5.4;const fx=-Math.sin(yaw),fz=-Math.cos(yaw),rx=Math.cos(yaw),rz=-Math.sin(yaw);moveEntity(player,(fx*f+rx*s)*speed*dt,(fz*f+rz*s)*speed*dt);player.group.rotation.y=yaw;
+ if(move.Space)shootPlayer();updateCPU(dt,now);
+ for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];p.mesh.position.addScaledVector(p.vel,dt);p.life-=dt;const pos=p.mesh.position;if(Math.abs(pos.x)>half||Math.abs(pos.z)>half||p.life<=0||pos.y<.1){paintAt(pos.x,pos.z,p.team,1.85);scene.remove(p.mesh);projectiles.splice(i,1)}else{paintAt(pos.x,pos.z,p.team,.4)}}
+ updateUI();if(time<=0)finish();
+ }
+ const target=player.group.position;const forward=new THREE.Vector3(-Math.sin(yaw),Math.sin(pitch),-Math.cos(yaw));const camPos=target.clone().add(new THREE.Vector3(Math.sin(yaw)*8,4.5+pitch*2,Math.cos(yaw)*8));camera.position.lerp(camPos,.12);camera.lookAt(target.clone().add(forward.clone().multiplyScalar(4)).add(new THREE.Vector3(0,1.1,0)));
+ renderer.render(scene,camera)
+}requestAnimationFrame(loop);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body></html>
